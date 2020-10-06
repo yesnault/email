@@ -177,7 +177,7 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 				return e, err
 			}
 			filename, filenameDefined := params["filename"]
-			if cd == "attachment" || (cd == "inline" && filenameDefined){
+			if cd == "attachment" || (cd == "inline" && filenameDefined) {
 				_, err = e.Attach(bytes.NewReader(p.body), filename, ct)
 				if err != nil {
 					return e, err
@@ -655,9 +655,15 @@ func (e *Email) SendWithStartTLS(addr string, a smtp.Auth, t *tls.Config) error 
 		return err
 	}
 
-	// Taken from the standard library
-	// https://github.com/golang/go/blob/master/src/net/smtp/smtp.go#L328
-	c, err := smtp.Dial(addr)
+	// Here is the key, you need to call tls.Dial instead of smtp.Dial
+	// for smtp servers running on 465 that require an ssl connection
+	// from the very beginning (no starttls)
+	conn, err := tls.Dial("tcp", addr, t)
+	if err != nil {
+		return err
+	}
+
+	c, err := smtp.NewClient(conn, t.ServerName)
 	if err != nil {
 		return err
 	}
