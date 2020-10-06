@@ -535,7 +535,45 @@ func (e *Email) Send(addr string, a smtp.Auth) error {
 	if err != nil {
 		return err
 	}
-	return smtp.SendMail(addr, a, sender, to, raw)
+
+	c, err := smtp.Dial(addr)
+	if err != nil {
+		return err
+	}
+
+	defer c.Close()
+	if err = c.Hello("localhost"); err != nil {
+		return err
+	}
+
+	if a != nil {
+		if ok, _ := c.Extension("AUTH"); ok {
+			if err = c.Auth(a); err != nil {
+				return err
+			}
+		}
+	}
+	if err = c.Mail(sender); err != nil {
+		return err
+	}
+	for _, addr := range to {
+		if err = c.Rcpt(addr); err != nil {
+			return err
+		}
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(raw)
+	if err != nil {
+		return err
+	}
+	err = w.Close()
+	if err != nil {
+		return err
+	}
+	return c.Quit()
 }
 
 // Select and parse an SMTP envelope sender address.  Choose Email.Sender if set, or fallback to Email.From.
